@@ -1,9 +1,11 @@
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
+from neo4j.exceptions import ConstraintError
 from pydantic import BaseModel
 
 from backend.config import config
+from backend.database import database
 
 
 class User(BaseModel):
@@ -52,42 +54,37 @@ users_api = APIRouter(tags=['users'])
 
 @users_api.post('/users', response_model=UserOut)
 def create_user(user: UserIn):
-    return user
+    with database.session as s:
+        try:
+            s.run('CREATE (n:User { username: $username, password: $password })', user.dict())
+        except ConstraintError:
+            raise HTTPException(status.HTTP_406_NOT_ACCEPTABLE, detail='User already exists') from None
+        else:
+            return user
 
 
 @users_api.get('/users/{username}', response_model=UserOut)
 def get_specific_user(username: str):
-    return UserOut(
-        username=username,
-        posts=[
-            config.api_url_prefix + api.url_path_for('get_specific_post', post_id=1),
-            config.api_url_prefix + api.url_path_for('get_specific_post', post_id=2),
-        ],
-        comments=[
-            config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=1),
-            config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=2),
-        ]
-    )
+    with database.session as s:
+        results = s.run('MATCH (n:User) WHERE n.username = $username RETURN n', username=username).single()
+        if not results:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Not found')
+
+        user = results['n']
+        return UserOut(
+            username=user['username'],
+        )
 
 
 @users_api.get('/users', response_model=List[UserOut])
 def get_users():
-    return [
-        UserOut(
-            username='FirstExampleUser',
-        ),
-        UserOut(
-            username='SecondExampleUser',
-            posts=[
-                config.api_url_prefix + api.url_path_for('get_specific_post', post_id=1),
-                config.api_url_prefix + api.url_path_for('get_specific_post', post_id=2),
-            ],
-            comments=[
-                config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=1),
-                config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=2),
-            ]
-        ),
-    ]
+    with database.session as s:
+        users: List[UserOut] = []
+        for user in s.run('MATCH (n:User) RETURN n').value():
+            users.append(UserOut(
+                username=user['username'],
+            ))
+        return users
 
 
 posts_api = APIRouter(tags=['posts'])
