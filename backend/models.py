@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic.main import BaseModel
 
@@ -14,6 +14,7 @@ class UserIn(User):
 class UserOut(User):
     posts: List[str] = []
     comments: List[str] = []
+    self: Optional[str] = None
 
 
 class Comment(BaseModel):
@@ -25,6 +26,8 @@ class CommentIn(Comment):
 
 
 class CommentOut(Comment):
+    uuid: str
+    timestamp: str
     likes: int = 0
     user: str
     post: str
@@ -39,6 +42,8 @@ class PostIn(Post):
 
 
 class PostOut(Post):
+    uuid: str
+    timestamp: str
     likes: int = 0
     user: str
     comments: List[str] = []
