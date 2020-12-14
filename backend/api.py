@@ -1,55 +1,34 @@
 from typing import List
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from neo4j.exceptions import ConstraintError
-from pydantic import BaseModel
 
 from backend.config import config
 from backend.database import database
-
-
-class User(BaseModel):
-    username: str
-
-
-class UserIn(User):
-    password: str
-
-
-class UserOut(User):
-    posts: List[str] = []
-    comments: List[str] = []
-
-
-class Comment(BaseModel):
-    content: str
-
-
-class CommentIn(Comment):
-    pass
-
-
-class CommentOut(Comment):
-    likes: int = 0
-    user: str
-    post: str
-
-
-class Post(BaseModel):
-    content: str
-
-
-class PostIn(Post):
-    pass
-
-
-class PostOut(Post):
-    likes: int = 0
-    user: str
-    comments: List[str] = []
+from backend.models import CommentIn, CommentOut, PostIn, PostOut, UserIn, UserOut
+from backend.security import create_auth_token
 
 
 users_api = APIRouter(tags=['users'])
+
+
+@users_api.post('/login', response_model=UserOut, tags=['authentication'])
+def login(response: Response, user: UserIn):
+    with database.session as s:
+        results = s.run('MATCH (n:User) WHERE n.username = $username AND n.password = $password RETURN n',
+                        username=user.username, password=user.password).single()
+        if not results:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Wrong credentials')
+
+        token = create_auth_token(user)
+        response.set_cookie(
+            key=config.auth_token_name,
+            value=token,
+            max_age=config.cookie_max_age_seconds,
+        )
+
+        user = results['n']
+        return UserOut(**user)
 
 
 @users_api.post('/users', response_model=UserOut)
@@ -71,9 +50,7 @@ def get_specific_user(username: str):
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Not found')
 
         user = results['n']
-        return UserOut(
-            username=user['username'],
-        )
+        return UserOut(**user)
 
 
 @users_api.get('/users', response_model=List[UserOut])
