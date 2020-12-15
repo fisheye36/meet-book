@@ -23,9 +23,9 @@ def get_user_from_token(token: str) -> UserOut:
     with database.session as s:
         results = s.run('MATCH (n:User) WHERE n.username = $username RETURN n', username=username).single()
         if not results:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Not found')
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Wrong credentials')
 
-        user = results['n']
+        db_user = results['n']
         return UserOut(
-            username=user['username'],
+            **db_user,
         )

@@ -55,7 +55,7 @@ def get_specific_user(username: str):
         nodes = s.run('MATCH (u:User)-->(p:Post) WHERE u.username = $username RETURN u, p',
                       username=username).graph().nodes
         if not nodes:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Not found')
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='User not found')
 
         db_user, *db_posts = nodes
         return UserOut(
@@ -102,7 +102,7 @@ def get_specific_post(post_id: str):
         nodes = s.run('MATCH (p:Post)<-[:Posted]-(u:User) WHERE p.uuid = $uuid RETURN p, u',
                       uuid=post_id).graph().nodes
         if not nodes:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Not found')
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Post not found')
 
         db_post, db_user = nodes
         return PostOut(
@@ -131,12 +131,29 @@ comments_api = APIRouter(tags=['comments'])
 
 
 @comments_api.post('/posts/{post_id}/comments', response_model=CommentOut)
-def create_comment(post_id: str, comment: CommentIn):
-    return CommentOut(
-        **comment.dict(),
-        user=config.api_url_prefix + api.url_path_for('get_specific_user', username='ExampleUser'),
-        post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=post_id),
-    )
+def create_comment(post_id: str, comment: CommentIn, user: UserOut = Depends(get_logged_user)):
+    with database.session as s:
+        try:
+            results = s.run('MATCH (u:User), (p:Post) WHERE u.username = $username AND p.uuid = $post_id '
+                            'CREATE (u)-[c:Commented { uuid: $uuid, timestamp: timestamp(), content: $content }]->(p) '
+                            'RETURN c',
+                            username=user.username,
+                            post_id=post_id,
+                            uuid=uuid(),
+                            content=comment.content).single()
+        except ConstraintError:
+            raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail='Comment UUID duplication') from None
+        else:
+            if not results:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Post not found')
+
+            db_comment = results['c']
+            return CommentOut(
+                **db_comment,
+                user=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username),
+                post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=post_id),
+                self=config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid']),
+            )
 
 
 @comments_api.get('/comments/{comment_id}', response_model=CommentOut)
@@ -148,6 +165,8 @@ def get_specific_comment(comment_id: str):
         post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id='1'),
     )
 
+
+# TODO: get_comments_for_post
 
 api = APIRouter()
 api.include_router(users_api)
