@@ -62,7 +62,7 @@ def get_specific_user(username: str):
             **db_user,
             posts=[config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid'])
                    for db_post in db_posts],
-            self=config.api_url_prefix + api.url_path_for('get_specific_user', username=db_user.username),
+            self=config.api_url_prefix + api.url_path_for('get_specific_user', username=username),
         )
 
 
@@ -116,12 +116,11 @@ def get_specific_post(post_id: str):
 def get_posts():
     posts: List[PostOut] = []
     with database.session as s:
-        for record in s.run('MATCH (p:Post)<-[:Posted]-(u:User) RETURN p, u ORDER BY p.timestamp DESC'):
+        for record in s.run('MATCH (p:Post)<-[:Posted]-(u:User) RETURN p, u.username ORDER BY p.timestamp DESC'):
             db_post = record['p']
-            db_user = record['u']
             posts.append(PostOut(
                 **db_post,
-                user=config.api_url_prefix + api.url_path_for('get_specific_user', username=db_user['username']),
+                user=config.api_url_prefix + api.url_path_for('get_specific_user', username=record['u.username']),
                 self=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid']),
             ))
         return posts
@@ -158,12 +157,20 @@ def create_comment(post_id: str, comment: CommentIn, user: UserOut = Depends(get
 
 @comments_api.get('/comments/{comment_id}', response_model=CommentOut)
 def get_specific_comment(comment_id: str):
-    return CommentOut(
-        content='ExampleCommentContent',
-        likes=8,
-        user=config.api_url_prefix + api.url_path_for('get_specific_user', username='ExampleUser'),
-        post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id='1'),
-    )
+    with database.session as s:
+        results = s.run('MATCH (p:Post)<-[c:Commented]-(u:User) WHERE c.uuid = $comment_id '
+                        'RETURN c, p.uuid, u.username',
+                        comment_id=comment_id).single()
+        if not results:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Comment not found')
+
+        db_comment = results['c']
+        return CommentOut(
+            **db_comment,
+            user=config.api_url_prefix + api.url_path_for('get_specific_user', username=results['u.username']),
+            post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=results['p.uuid']),
+            self=config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid']),
+        )
 
 
 # TODO: get_comments_for_post
