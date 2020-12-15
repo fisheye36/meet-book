@@ -21,6 +21,7 @@ class Database:
     def __del__(self) -> None:
         if hasattr(self, '_driver'):
             self._driver.close()
+            print('Ending DB session')
 
 
 database = Database()

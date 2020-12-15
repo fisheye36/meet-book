@@ -31,6 +31,7 @@ class CommentOut(Comment):
     likes: int = 0
     user: str
     post: str
+    self: Optional[str] = None
 
 
 class Post(BaseModel):
@@ -47,3 +48,4 @@ class PostOut(Post):
     likes: int = 0
     user: str
     comments: List[str] = []
+    self: Optional[str] = None

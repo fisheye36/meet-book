@@ -28,9 +28,9 @@ def login(response: Response, user: UserIn):
             max_age=config.cookie_max_age_seconds,
         )
 
-        response_user = results['u']
+        db_user = results['u']
         return UserOut(
-            **response_user,
+            **db_user,
             self=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username),
         )
 
@@ -57,22 +57,19 @@ def get_specific_user(username: str):
         if not nodes:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Not found')
 
-        user, *posts = nodes
+        db_user, *db_posts = nodes
         return UserOut(
-            **user,
-            posts=[config.api_url_prefix + api.url_path_for('get_specific_post', post_id=post['uuid'])
-                   for post in posts],
-            self=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username),
+            **db_user,
+            posts=[config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid'])
+                   for db_post in db_posts],
+            self=config.api_url_prefix + api.url_path_for('get_specific_user', username=db_user.username),
         )
 
 
 @users_api.get('/users', response_model=List[UserOut])
 def get_users():
     with database.session as s:
-        users: List[UserOut] = []
-        for user in s.run('MATCH (u:User) RETURN u').value():
-            users.append(UserOut(**user))
-        return users
+        return [UserOut(**db_user) for db_user in s.run('MATCH (u:User) RETURN u').value()]
 
 
 posts_api = APIRouter(tags=['posts'])
@@ -81,19 +78,23 @@ posts_api = APIRouter(tags=['posts'])
 @posts_api.post('/posts', response_model=PostOut)
 def create_post(post: PostIn, user: UserOut = Depends(get_logged_user)):
     with database.session as s:
-        results = s.run('MATCH (u:User) WHERE u.username = $username '
-                        'CREATE (p:Post { uuid: $uuid, timestamp: $timestamp, content: $content })<-[:Posted]-(u) '
-                        'RETURN p',
-                        username=user.username,
-                        uuid=uuid(),
-                        timestamp=timestamp(),
-                        content=post.content).single()
-
-        post = results['p']
-        return PostOut(
-            **post,
-            user=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username)
-        )
+        try:
+            results = s.run('MATCH (u:User) WHERE u.username = $username '
+                            'CREATE (p:Post { uuid: $uuid, timestamp: $timestamp, content: $content })<-[:Posted]-(u) '
+                            'RETURN p',
+                            username=user.username,
+                            uuid=uuid(),
+                            timestamp=timestamp(),
+                            content=post.content).single()
+        except ConstraintError:
+            raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail='Post UUID duplication') from None
+        else:
+            db_post = results['p']
+            return PostOut(
+                **db_post,
+                user=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username),
+                self=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid']),
+            )
 
 
 @posts_api.get('/posts/{post_id}', response_model=PostOut)
