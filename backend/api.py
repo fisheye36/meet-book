@@ -99,15 +99,18 @@ def create_post(post: PostIn, user: UserOut = Depends(get_logged_user)):
 
 @posts_api.get('/posts/{post_id}', response_model=PostOut)
 def get_specific_post(post_id: str):
-    return PostOut(
-        content='ExamplePost',
-        likes=4,
-        user=config.api_url_prefix + api.url_path_for('get_specific_user', username='ExampleUser'),
-        comments=[
-            config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id='1'),
-            config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id='2'),
-        ],
-    )
+    with database.session as s:
+        nodes = s.run('MATCH (p:Post)<-[:Posted]-(u:User) WHERE p.uuid = $uuid RETURN p, u',
+                      uuid=post_id).graph().nodes
+        if not nodes:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Not found')
+
+        db_post, db_user = nodes
+        return PostOut(
+            **db_post,
+            user=config.api_url_prefix + api.url_path_for('get_specific_user', username=db_user['username']),
+            self=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid']),
+        )
 
 
 @posts_api.get('/posts', response_model=List[PostOut])
