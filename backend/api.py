@@ -173,7 +173,22 @@ def get_specific_comment(comment_id: str):
         )
 
 
-# TODO: get_comments_for_post
+@comments_api.get('/posts/{post_id}/comments', response_model=List[CommentOut])
+def get_post_comments(post_id: str):
+    comments: List[CommentOut] = []
+    with database.session as s:
+        for record in s.run('MATCH (p:Post)<-[c:Commented]-(u:User) WHERE p.uuid = $post_id '
+                            'RETURN p.uuid, c, u.username ORDER BY c.timestamp DESC',
+                            post_id=post_id):
+            db_comment = record['c']
+            comments.append(CommentOut(
+                **db_comment,
+                user=config.api_url_prefix + api.url_path_for('get_specific_user', username=record['u.username']),
+                post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=record['p.uuid']),
+                self=config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid']),
+            ))
+        return comments
+
 
 api = APIRouter()
 api.include_router(users_api)

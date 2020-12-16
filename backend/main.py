@@ -6,7 +6,7 @@ from backend.api import api
 from backend.config import config
 
 
-app = FastAPI()
+app = FastAPI(title='MeetBook')
 app.include_router(api, prefix=config.api_url_prefix)
 
 
