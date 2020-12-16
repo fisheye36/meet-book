@@ -12,6 +12,9 @@ class Database:
             init_session.run('CREATE CONSTRAINT unique_username IF NOT EXISTS '
                              'ON (n:User) '
                              'ASSERT n.username IS UNIQUE')
+            init_session.run('CREATE CONSTRAINT unique_post_uuid IF NOT EXISTS '
+                             'ON (p:Post) '
+                             'ASSERT p.uuid IS UNIQUE')
 
     @property
     def session(self) -> Session:
