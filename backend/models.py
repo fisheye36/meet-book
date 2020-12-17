@@ -14,7 +14,7 @@ class UserIn(User):
 class UserOut(User):
     posts: List[str] = []
     comments: List[str] = []
-    self: Optional[str] = None
+    url: str
 
 
 class Comment(BaseModel):

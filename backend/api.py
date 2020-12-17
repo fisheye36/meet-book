@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from neo4j import Record, Session
 from neo4j.exceptions import ConstraintError
 
 from backend.config import config
@@ -16,8 +17,12 @@ users_api = APIRouter(tags=['users'])
 @users_api.post('/login', response_model=UserOut, tags=['authentication'])
 def login(response: Response, user: UserIn):
     with database.session as s:
-        results = s.run('MATCH (u:User) WHERE u.username = $username AND u.password = $password RETURN u',
-                        username=user.username, password=user.password).single()
+        results = s.run(
+            'MATCH (u:User { username: $username, password: $password } )'
+            'RETURN u',
+            username=user.username,
+            password=user.password,
+        ).single()
         if not results:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Wrong credentials')
 
@@ -28,48 +33,72 @@ def login(response: Response, user: UserIn):
             max_age=config.cookie_max_age_seconds,
         )
 
-        db_user = results['u']
-        return UserOut(
-            **db_user,
-            self=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username),
-        )
+        return _get_user_from_db(s, user.username)
 
 
 @users_api.post('/users', response_model=UserOut)
-def create_user(user: UserIn):
+def create_user(response: Response, user: UserIn):
     with database.session as s:
         try:
             s.run('CREATE (u:User { username: $username, password: $password })', user.dict())
         except ConstraintError:
             raise HTTPException(status.HTTP_406_NOT_ACCEPTABLE, detail='User already exists') from None
         else:
+            response.status_code = status.HTTP_201_CREATED
             return UserOut(
                 **user.dict(),
-                self=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username)
+                url=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username)
             )
 
 
 @users_api.get('/users/{username}', response_model=UserOut)
 def get_specific_user(username: str):
     with database.session as s:
-        nodes = s.run('MATCH (u:User)-->(p:Post) WHERE u.username = $username RETURN u, p',
-                      username=username).graph().nodes
-        if not nodes:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='User not found')
-
-        db_user, *db_posts = nodes
-        return UserOut(
-            **db_user,
-            posts=[config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid'])
-                   for db_post in db_posts],
-            self=config.api_url_prefix + api.url_path_for('get_specific_user', username=username),
-        )
+        return _get_user_from_db(s, username)
 
 
 @users_api.get('/users', response_model=List[UserOut])
 def get_users():
     with database.session as s:
-        return [UserOut(**db_user) for db_user in s.run('MATCH (u:User) RETURN u').value()]
+        return _get_users_from_db(s)
+
+
+def _get_user_from_db(s: Session, username: str) -> UserOut:
+    record = s.run(
+        'MATCH (u:User {username: $username}) '
+        'WITH u, [(u)-[:Posted]->(p:Post) | p] as posts, [(u)-[c:Commented]->(:Post) | c] as comments '
+        'return u, posts, comments',
+        username=username,
+    ).single()
+    if not record:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail='User not found')
+
+    return _build_user_from_db_record(record)
+
+
+def _get_users_from_db(s: Session) -> List[UserOut]:
+    results = s.run(
+        'MATCH (u:User) '
+        'WITH u, [(u)-[:Posted]->(p:Post) | p] as posts, [(u)-[c:Commented]->(:Post) | c] as comments '
+        'return u, posts, comments',
+    )
+
+    return [_build_user_from_db_record(record) for record in results]
+
+
+def _build_user_from_db_record(record: Record) -> UserOut:
+    db_user = record['u']
+    db_posts = sorted(record['posts'], key=lambda p: p['timestamp'])
+    db_comments = sorted(record['comments'], key=lambda c: c['timestamp'])
+
+    return UserOut(
+        **db_user,
+        posts=[config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid'])
+               for db_post in db_posts],
+        comments=[config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid'])
+                  for db_comment in db_comments],
+        url=config.api_url_prefix + api.url_path_for('get_specific_user', username=db_user['username']),
+    )
 
 
 posts_api = APIRouter(tags=['posts'])

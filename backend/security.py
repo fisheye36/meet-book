@@ -28,4 +28,5 @@ def get_user_from_token(token: str) -> UserOut:
         db_user = results['n']
         return UserOut(
             **db_user,
+            url='/',
         )
