@@ -1,5 +1,12 @@
 fastapi==0.62.0
 pydantic==1.7.3
 starlette==0.13.6
+
 neo4j==4.2.0
 pytz==2020.4
+
+jwcrypto==0.8
+cryptography==3.3.1
+cffi==1.14.4
+pycparser==2.20
+six==1.15.0
