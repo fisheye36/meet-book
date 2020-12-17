@@ -1,13 +1,29 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Cookie, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBase
 from jwcrypto import jwk, jwt
 from jwcrypto.common import JWException
 
 from backend.config import config
 from backend.database import database
 from backend.models import UserIn, UserOut
+
+
+class HttpCookieToken(HTTPBase):
+
+    def __call__(self, request: Request):
+        token = request.cookies.get(config.auth_token_name)
+        if not token:
+            if self.auto_error:
+                raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Token missing')
+            else:
+                return None
+        return HTTPAuthorizationCredentials(scheme='', credentials=token)
+
+
+auth_scheme = HttpCookieToken(scheme='bearer')
 
 
 def create_auth_token(user: UserIn) -> str:
@@ -38,7 +54,8 @@ def _get_token_key() -> jwk.JWK:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Token generation fail') from None
 
 
-def get_logged_user(token: str = Cookie(..., alias=config.auth_token_name)) -> UserOut:
+def get_logged_user(auth_credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)) -> UserOut:
+    token = auth_credentials.credentials
     user = get_user_from_token(token)
     return user
 
