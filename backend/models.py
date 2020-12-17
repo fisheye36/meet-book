@@ -45,7 +45,6 @@ class PostIn(Post):
 class PostOut(Post):
     uuid: str
     timestamp: str
-    likes: int = 0
-    user: str
+    author: str
     comments: List[str] = []
-    self: Optional[str] = None
+    url: str

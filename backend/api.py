@@ -105,54 +105,76 @@ posts_api = APIRouter(tags=['posts'])
 
 
 @posts_api.post('/posts', response_model=PostOut)
-def create_post(post: PostIn, user: UserOut = Depends(get_logged_user)):
+def create_post(response: Response, post: PostIn, user: UserOut = Depends(get_logged_user)):
     with database.session as s:
         try:
-            results = s.run('MATCH (u:User) WHERE u.username = $username '
-                            'CREATE (p:Post { uuid: $uuid, timestamp: timestamp(), content: $content })<-[:Posted]-(u) '
-                            'RETURN p',
-                            username=user.username,
-                            uuid=uuid(),
-                            content=post.content).single()
+            results = s.run(
+                'MATCH (u:User { username: $username }) '
+                'CREATE (p:Post { uuid: $uuid, timestamp: timestamp(), content: $content })<-[:Posted]-(u) '
+                'RETURN p',
+                username=user.username,
+                uuid=uuid(),
+                content=post.content
+            ).single()
         except ConstraintError:
             raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail='Post UUID duplication') from None
         else:
+            response.status_code = status.HTTP_201_CREATED
             db_post = results['p']
             return PostOut(
                 **db_post,
-                user=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username),
-                self=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid']),
+                author=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username),
+                url=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid']),
             )
 
 
 @posts_api.get('/posts/{post_id}', response_model=PostOut)
 def get_specific_post(post_id: str):
     with database.session as s:
-        nodes = s.run('MATCH (p:Post)<-[:Posted]-(u:User) WHERE p.uuid = $uuid RETURN p, u',
-                      uuid=post_id).graph().nodes
-        if not nodes:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Post not found')
-
-        db_post, db_user = nodes
-        return PostOut(
-            **db_post,
-            user=config.api_url_prefix + api.url_path_for('get_specific_user', username=db_user['username']),
-            self=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid']),
-        )
+        return _get_post_from_db(s, post_id)
 
 
 @posts_api.get('/posts', response_model=List[PostOut])
 def get_posts():
-    posts: List[PostOut] = []
     with database.session as s:
-        for record in s.run('MATCH (p:Post)<-[:Posted]-(u:User) RETURN p, u.username ORDER BY p.timestamp DESC'):
-            db_post = record['p']
-            posts.append(PostOut(
-                **db_post,
-                user=config.api_url_prefix + api.url_path_for('get_specific_user', username=record['u.username']),
-                self=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid']),
-            ))
-        return posts
+        return _get_posts_from_db(s)
+
+
+def _get_post_from_db(s: Session, post_id: str) -> PostOut:
+    record = s.run(
+        'MATCH (p:Post { uuid: $uuid })<-[:Posted]-(u:User) '
+        'WITH p, u, [(p)<-[c:Commented]-(:User) | c] as comments '
+        'RETURN p, u, comments',
+        uuid=post_id,
+    ).single()
+    if not record:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Post not found')
+
+    return _build_post_from_db_record(record)
+
+
+def _get_posts_from_db(s: Session) -> List[PostOut]:
+    results = s.run(
+        'MATCH (p:Post)<-[:Posted]-(u:User) '
+        'WITH p, u, [(p)<-[c:Commented]-(:User) | c] as comments '
+        'RETURN p, u, comments',
+    )
+
+    return sorted([_build_post_from_db_record(record) for record in results], key=lambda p: p.timestamp, reverse=True)
+
+
+def _build_post_from_db_record(record: Record) -> PostOut:
+    db_post = record['p']
+    db_user = record['u']
+    db_comments = sorted(record['comments'], key=lambda c: c['timestamp'])
+
+    return PostOut(
+        **db_post,
+        author=config.api_url_prefix + api.url_path_for('get_specific_user', username=db_user['username']),
+        comments=[config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid'])
+                  for db_comment in db_comments],
+        url=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid']),
+    )
 
 
 comments_api = APIRouter(tags=['comments'])
