@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from pydantic.main import BaseModel
 
@@ -28,10 +28,9 @@ class CommentIn(Comment):
 class CommentOut(Comment):
     uuid: str
     timestamp: str
-    likes: int = 0
-    user: str
+    author: str
     post: str
-    self: Optional[str] = None
+    url: str
 
 
 class Post(BaseModel):

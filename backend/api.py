@@ -181,64 +181,94 @@ comments_api = APIRouter(tags=['comments'])
 
 
 @comments_api.post('/posts/{post_id}/comments', response_model=CommentOut)
-def create_comment(post_id: str, comment: CommentIn, user: UserOut = Depends(get_logged_user)):
+def create_comment(response: Response, post_id: str, comment: CommentIn, user: UserOut = Depends(get_logged_user)):
     with database.session as s:
-        try:
-            results = s.run('MATCH (u:User), (p:Post) WHERE u.username = $username AND p.uuid = $post_id '
-                            'CREATE (u)-[c:Commented { uuid: $uuid, timestamp: timestamp(), content: $content }]->(p) '
-                            'RETURN c',
-                            username=user.username,
-                            post_id=post_id,
-                            uuid=uuid(),
-                            content=comment.content).single()
-        except ConstraintError:
-            raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail='Comment UUID duplication') from None
-        else:
-            if not results:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Post not found')
+        if not s.run('MATCH (p:Post { uuid: $uuid }) RETURN p', uuid=post_id).single():
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Post not found')
 
-            db_comment = results['c']
-            return CommentOut(
-                **db_comment,
-                user=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username),
-                post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=post_id),
-                self=config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid']),
-            )
+        results = s.run(
+            'MATCH (u:User { username: $username }), (p:Post { uuid: $post_id } ) '
+            'CREATE (u)-[c:Commented { uuid: $uuid, timestamp: timestamp(), content: $content }]->(p) '
+            'RETURN c',
+            username=user.username,
+            post_id=post_id,
+            uuid=uuid(),
+            content=comment.content
+        ).single()
+
+        response.status_code = status.HTTP_201_CREATED
+        db_comment = results['c']
+        return CommentOut(
+            **db_comment,
+            author=config.api_url_prefix + api.url_path_for('get_specific_user', username=user.username),
+            post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=post_id),
+            url=config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid']),
+        )
 
 
 @comments_api.get('/comments/{comment_id}', response_model=CommentOut)
 def get_specific_comment(comment_id: str):
     with database.session as s:
-        results = s.run('MATCH (p:Post)<-[c:Commented]-(u:User) WHERE c.uuid = $comment_id '
-                        'RETURN c, p.uuid, u.username',
-                        comment_id=comment_id).single()
-        if not results:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Comment not found')
+        return _get_comment_from_db(s, comment_id)
 
-        db_comment = results['c']
-        return CommentOut(
-            **db_comment,
-            user=config.api_url_prefix + api.url_path_for('get_specific_user', username=results['u.username']),
-            post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=results['p.uuid']),
-            self=config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid']),
-        )
+
+@comments_api.get('/comments', response_model=List[CommentOut])
+def get_comments():
+    with database.session as s:
+        return _get_comments_from_db(s)
 
 
 @comments_api.get('/posts/{post_id}/comments', response_model=List[CommentOut])
 def get_post_comments(post_id: str):
-    comments: List[CommentOut] = []
     with database.session as s:
-        for record in s.run('MATCH (p:Post)<-[c:Commented]-(u:User) WHERE p.uuid = $post_id '
-                            'RETURN p.uuid, c, u.username ORDER BY c.timestamp DESC',
-                            post_id=post_id):
-            db_comment = record['c']
-            comments.append(CommentOut(
-                **db_comment,
-                user=config.api_url_prefix + api.url_path_for('get_specific_user', username=record['u.username']),
-                post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=record['p.uuid']),
-                self=config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid']),
-            ))
-        return comments
+        return _get_post_comments_from_db(s, post_id)
+
+
+def _get_comment_from_db(s: Session, comment_id: str) -> CommentOut:
+    record = s.run(
+        'MATCH (u:User)-[c:Commented { uuid: $uuid }]->(p:Post) '
+        'RETURN c, u, p',
+        uuid=comment_id,
+    ).single()
+    if not record:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Comment not found')
+
+    return _build_comment_from_db_record(record)
+
+
+def _get_comments_from_db(s: Session) -> List[CommentOut]:
+    results = s.run(
+        'MATCH (u:User)-[c:Commented]->(p:Post) '
+        'RETURN c, u, p',
+    )
+
+    return sorted([_build_comment_from_db_record(record) for record in results], key=lambda c: c.timestamp)
+
+
+def _get_post_comments_from_db(s: Session, post_id: str) -> List[CommentOut]:
+    if not s.run('MATCH (p:Post { uuid: $uuid }) RETURN p', uuid=post_id).single():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail='Post not found')
+
+    results = s.run(
+        'MATCH (u:User)-[c:Commented]->(p:Post { uuid: $uuid }) '
+        'RETURN c, u, p',
+        uuid=post_id,
+    )
+
+    return sorted([_build_comment_from_db_record(record) for record in results], key=lambda c: c.timestamp)
+
+
+def _build_comment_from_db_record(record: Record) -> CommentOut:
+    db_comment = record['c']
+    db_user = record['u']
+    db_post = record['p']
+
+    return CommentOut(
+        **db_comment,
+        author=config.api_url_prefix + api.url_path_for('get_specific_user', username=db_user['username']),
+        post=config.api_url_prefix + api.url_path_for('get_specific_post', post_id=db_post['uuid']),
+        url=config.api_url_prefix + api.url_path_for('get_specific_comment', comment_id=db_comment['uuid']),
+    )
 
 
 api = APIRouter()
