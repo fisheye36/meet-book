@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <title>Login on MeetBook</title>
+  <meta name="description" content="MeetBook login">
+  <meta name="author" content="Kamil Warchoł">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <link rel="stylesheet" href="/assets/css/main.css" />
+</head>
+
+<body>
+<div id="main">
+  <h2>Login</h2>
+  <label for="username">Login:</label>
+  <input id="username" name="username" type="text">
+  <label for="password">Hasło:</label>
+  <input id="password" name="password" type="password">
+  <button onclick="onLogin()">Zaloguj</button>
+  <p id="errorMessage"></p>
+</div>
+
+<script>
+    async function onLogin() {
+        const json = {
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value,
+        };
+        const data = JSON.stringify(json);
+        const response = await fetch('{{ login_endpoint }}', {method: 'POST', body: data});
+        if (response.status !== 200) {
+            const errorElement = document.getElementById('errorMessage');
+
+            errorElement.innerText = 'Invalid credentials!';
+            await sleep(2000);
+            errorElement.innerText = '';
+        }
+        else {
+            const user = await response.json();
+            window.location.assign(user.url);
+        }
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+</script>
+</body>
+</html>
