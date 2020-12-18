@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block content %}
+  <div>
+    <h2>Register</h2>
+    <label for="username">Login:</label>
+    <input id="username" name="username" type="text">
+    <label for="password">Hasło:</label>
+    <input id="password" name="password" type="password">
+    <label for="password-confirmation">Hasło (powtórz):</label>
+    <input id="password-confirmation" name="password" type="password">
+    <button onclick="onRegister()">Zarejestruj się</button>
+    <p id="errorMessage"></p>
+  </div>
+
+  <script>
+      async function onRegister() {
+          const password = document.getElementById('password').value;
+          const passwordConfirmation = document.getElementById('password-confirmation').value;
+          const errorElement = document.getElementById('errorMessage');
+
+          if (password !== passwordConfirmation) {
+              errorElement.innerText = "Passwords don't match!";
+              await sleep(2000);
+              errorElement.innerText = '';
+          } else {
+              const json = {
+                  username: document.getElementById('username').value,
+                  password: document.getElementById('password').value,
+              };
+              const data = JSON.stringify(json);
+
+              const response = await fetch('{{ register_endpoint }}', {method: 'POST', body: data});
+
+              if (response.status !== 201) {
+                  errorElement.innerText = 'User already exists!';
+                  await sleep(2000);
+                  errorElement.innerText = '';
+              } else {
+                  window.location.assign('{{ login_endpoint }}');
+              }
+          }
+      }
+
+      function sleep(ms) {
+          return new Promise(resolve => setTimeout(resolve, ms));
+      }
+  </script>
+{% endblock %}
