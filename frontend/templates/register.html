@@ -42,6 +42,7 @@
                   await sleep(2000);
                   errorElement.innerText = '';
               } else {
+                  await logoutUser();
                   location.assign('/login');
               }
           }

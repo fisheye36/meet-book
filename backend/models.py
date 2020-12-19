@@ -3,6 +3,10 @@ from typing import List
 from pydantic import BaseModel, Extra
 
 
+class Message(BaseModel):
+    message: str
+
+
 class User(BaseModel):
     username: str
 

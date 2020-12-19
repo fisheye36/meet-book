@@ -6,7 +6,7 @@ from neo4j.exceptions import ConstraintError
 
 from backend.config import config
 from backend.database import database
-from backend.models import CommentIn, CommentOut, PostIn, PostOut, UserIn, UserOut
+from backend.models import CommentIn, CommentOut, Message, PostIn, PostOut, UserIn, UserOut
 from backend.security import create_auth_token, get_logged_user
 from backend.utils import uuid
 
@@ -34,6 +34,12 @@ def login(response: Response, user: UserIn):
         )
 
         return _get_user_from_db(s, user.username)
+
+
+@users_api.get('/logout', response_model=Message, tags=['authentication'])
+def logout(response: Response):
+    response.delete_cookie(key=config.auth_token_name)
+    return Message(message='Logged out')
 
 
 @users_api.post('/users', response_model=UserOut)
