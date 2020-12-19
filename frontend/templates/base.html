@@ -10,51 +10,108 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 
   <style>
-    .post {
-        margin-left: auto;
-        margin-right: auto;
-        width: 80em;
-        padding: 2em;
-    }
+      h1 {
+          text-align: center;
+      }
 
-    .post:nth-child(even) {
-        background-color: #917B57;
-    }
+      nav div {
+          margin-left: auto;
+          margin-right: auto;
+          width: 80em;
+      }
 
-    .post:nth-child(odd) {
-        background-color: #A48D66;
-    }
+      nav ul {
+          list-style-type: none;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+          background-color: #222;
+      }
 
-    .comment {
-        margin-left: 2em;
-    }
+      nav li {
+          display: inline-block;
+      }
 
-    .comment:nth-child(even) {
-        background-color: #878D55;
-    }
+      nav li a {
+          display: block;
+          color: white;
+          text-align: center;
+          text-decoration: none;
+          padding: 2em;
+      }
 
-    .comment:nth-child(odd) {
-        background-color: #99A164;
-    }
+      nav li a:hover {
+          background-color: slategray;
+      }
 
-    textarea {
-        display: block;
-        padding: 1em;
-        margin: 1em;
-        resize: none;
-        width: 60em;
-    }
+      .forms {
+          margin-left: auto;
+          margin-right: auto;
+          width: 40em;
+      }
 
-    .comment-input {
-        display: block;
-        padding: 0.5em;
-        margin: 1em;
-        width: 40em;
-    }
+      .post {
+          margin-left: auto;
+          margin-right: auto;
+          width: 80em;
+          padding: 2em;
+      }
+
+      .post:nth-child(even) {
+          background-color: #917B57;
+      }
+
+      .post:nth-child(odd) {
+          background-color: #A48D66;
+      }
+
+      .comment {
+          margin-left: 2em;
+      }
+
+      .comment:nth-child(even) {
+          background-color: #878D55;
+      }
+
+      .comment:nth-child(odd) {
+          background-color: #99A164;
+      }
+
+      textarea {
+          display: block;
+          padding: 1em;
+          margin: 1em;
+          resize: none;
+          width: 60em;
+      }
+
+      input[type="text"], input[type="password"] {
+          display: block;
+          padding: 0.5em;
+          margin: 1em;
+          width: 40em;
+      }
+
+      #error-message {
+          color: orangered;
+      }
   </style>
 </head>
 
 <body>
+<h1>
+  MeetBook
+</h1>
+<nav>
+  <div>
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/login">Login</a></li>
+      <li><a href="/logout">Logout</a></li>
+      <li><a href="/register">Register</a></li>
+    </ul>
+  </div>
+</nav>
 {% block content %}
 {% endblock %}
 </body>

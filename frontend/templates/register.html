@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Register{% endblock %}
 {% block content %}
-  <div>
+  <div class="forms">
     <h2>Register</h2>
     <label for="username">Login:</label>
     <input id="username" name="username" type="text">
@@ -10,14 +10,19 @@
     <label for="password-confirmation">Confirm password:</label>
     <input id="password-confirmation" name="password" type="password">
     <button onclick="onRegister()">Register</button>
-    <p id="errorMessage"></p>
+    <p id="error-message"></p>
   </div>
 
   <script>
       async function onRegister() {
+          const username = document.getElementById('username').value;
           const password = document.getElementById('password').value;
           const passwordConfirmation = document.getElementById('password-confirmation').value;
-          const errorElement = document.getElementById('errorMessage');
+          if (!username || !password || !passwordConfirmation) {
+              return;
+          }
+
+          const errorElement = document.getElementById('error-message');
 
           if (password !== passwordConfirmation) {
               errorElement.innerText = "Passwords don't match!";
@@ -25,8 +30,8 @@
               errorElement.innerText = '';
           } else {
               const json = {
-                  username: document.getElementById('username').value,
-                  password: document.getElementById('password').value,
+                  username: username,
+                  password: password,
               };
               const data = JSON.stringify(json);
 
