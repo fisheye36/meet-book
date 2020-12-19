@@ -5,7 +5,7 @@
     <div class="post">
       <label for="textarea">Write your post:</label>
       <textarea id="textarea" maxlength="512" rows="4"></textarea>
-      <input type="button" value="Post">
+      <input type="button" value="Post" onclick="createPost()">
     </div>
     {% for post in posts %}
       <div class="post">
@@ -34,4 +34,27 @@
       <p>There are no posts to see!</p>
     {% endfor %}
   </div>
+
+  <script>
+  async function createPost() {
+      const postContent = document.getElementById('textarea').value;
+      if (!postContent) {
+          return;
+      }
+
+      const json = {
+          content: postContent,
+      };
+      const data = JSON.stringify(json);
+
+      const response = await fetch('/api/posts', {method: 'POST', body: data});
+
+      if (response.status !== 201) {
+          location.assign('/login')
+      } else {
+          location.reload();
+      }
+  }
+
+  </script>
 {% endblock %}
