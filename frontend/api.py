@@ -5,9 +5,8 @@ import requests
 from fastapi import APIRouter
 from starlette.responses import HTMLResponse
 
-from backend.api import get_posts, get_post_comments
-from backend.config import config, jinja
-from backend.main import api
+from backend.api import get_post_comments, get_posts
+from backend.config import jinja
 from backend.models import UserOut
 
 
@@ -17,16 +16,13 @@ frontend_api = APIRouter()
 @frontend_api.get('/login', response_class=HTMLResponse)
 def login_page() -> str:
     template = jinja.get_template('login.html')
-    return template.render(login_endpoint=config.api_url_prefix + api.url_path_for('login'))
+    return template.render()
 
 
 @frontend_api.get('/register', response_class=HTMLResponse)
 def register_page() -> str:
     template = jinja.get_template('register.html')
-    return template.render(
-        register_endpoint=config.api_url_prefix + api.url_path_for('create_user'),
-        login_endpoint=frontend_api.url_path_for('login_page'),
-    )
+    return template.render()
 
 
 @frontend_api.get('/', response_class=HTMLResponse)

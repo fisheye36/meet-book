@@ -5,9 +5,9 @@
     <h2>Login</h2>
     <label for="username">Login:</label>
     <input id="username" name="username" type="text">
-    <label for="password">Hasło:</label>
+    <label for="password">Password:</label>
     <input id="password" name="password" type="password">
-    <button onclick="onLogin()">Zaloguj</button>
+    <button onclick="onLogin()">Login</button>
     <p id="errorMessage"></p>
   </div>
 
@@ -19,7 +19,7 @@
           };
           const data = JSON.stringify(json);
 
-          const response = await fetch('{{ login_endpoint }}', {method: 'POST', body: data});
+          const response = await fetch('/api/login', {method: 'POST', body: data});
 
           if (response.status !== 200) {
               const errorElement = document.getElementById('errorMessage');
@@ -28,8 +28,7 @@
               await sleep(2000);
               errorElement.innerText = '';
           } else {
-              const user = await response.json();
-              window.location.assign(user.url);
+              location.assign('/');
           }
       }
 

@@ -5,11 +5,11 @@
     <h2>Register</h2>
     <label for="username">Login:</label>
     <input id="username" name="username" type="text">
-    <label for="password">Hasło:</label>
+    <label for="password">Password:</label>
     <input id="password" name="password" type="password">
-    <label for="password-confirmation">Hasło (powtórz):</label>
+    <label for="password-confirmation">Confirm password:</label>
     <input id="password-confirmation" name="password" type="password">
-    <button onclick="onRegister()">Zarejestruj się</button>
+    <button onclick="onRegister()">Register</button>
     <p id="errorMessage"></p>
   </div>
 
@@ -30,14 +30,14 @@
               };
               const data = JSON.stringify(json);
 
-              const response = await fetch('{{ register_endpoint }}', {method: 'POST', body: data});
+              const response = await fetch('/api/users', {method: 'POST', body: data});
 
               if (response.status !== 201) {
                   errorElement.innerText = 'User already exists!';
                   await sleep(2000);
                   errorElement.innerText = '';
               } else {
-                  window.location.assign('{{ login_endpoint }}');
+                  location.assign('/login');
               }
           }
       }

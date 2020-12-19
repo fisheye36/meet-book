@@ -21,8 +21,6 @@
                 <a href="{{ comment.author }}">{{ comment.author_username }}</a>: {{ comment.content }}
               </p>
             </article>
-          {% else %}
-            <p>This post has no comments...</p>
           {% endfor %}
         </article>
         <div id="{{ post.uuid }}">
