@@ -25,7 +25,7 @@
         </article>
         <div id="{{ post.uuid }}">
           <label>Comment on this: <input class="comment-input" type="text"></label>
-          <input type="button" value="Comment">
+          <input type="button" value="Comment" onclick="createPostComment('{{ post.uuid }}')"/>
         </div>
       </div>
     {% else %}
@@ -34,25 +34,44 @@
   </div>
 
   <script>
-  async function createPost() {
-      const postContent = document.getElementById('textarea').value;
-      if (!postContent) {
-          return;
+      async function createPost() {
+          const postContent = document.getElementById('textarea').value;
+          if (!postContent) {
+              return;
+          }
+
+          const json = {
+              content: postContent,
+          };
+          const data = JSON.stringify(json);
+
+          const response = await fetch('/api/posts', {method: 'POST', body: data});
+
+          if (response.status !== 201) {
+              location.assign('/login')
+          } else {
+              location.reload();
+          }
       }
 
-      const json = {
-          content: postContent,
-      };
-      const data = JSON.stringify(json);
+      async function createPostComment(post_uuid) {
+          const commentContent = document.getElementById(post_uuid).querySelector('label input').value;
+          if (!commentContent) {
+              return;
+          }
 
-      const response = await fetch('/api/posts', {method: 'POST', body: data});
+          const json = {
+              content: commentContent,
+          };
+          const data = JSON.stringify(json);
 
-      if (response.status !== 201) {
-          location.assign('/login')
-      } else {
-          location.reload();
+          const response = await fetch(`/api/posts/${post_uuid}/comments`, {method: 'POST', body: data});
+
+          if (response.status !== 201) {
+              location.assign('/login')
+          } else {
+              location.reload();
+          }
       }
-  }
-
   </script>
 {% endblock %}
