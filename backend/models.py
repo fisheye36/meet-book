@@ -32,6 +32,9 @@ class CommentOut(Comment):
     post: str
     url: str
 
+    class Config:
+        extra = Extra.allow
+
 
 class Post(BaseModel):
     content: str

@@ -5,7 +5,7 @@ import requests
 from fastapi import APIRouter
 from starlette.responses import HTMLResponse
 
-from backend.api import get_posts
+from backend.api import get_posts, get_post_comments
 from backend.config import config, jinja
 from backend.main import api
 from backend.models import UserOut
@@ -37,6 +37,14 @@ def index_page() -> str:
         post.author_username = author.username
         post.date = datetime.fromtimestamp(int(post.timestamp) / 1000, timezone.utc).strftime('%d/%m/%Y %H:%M:%S %Z')
 
+        comments = get_post_comments(post_id=post.uuid)
+        for comment in comments:
+            comment_author = _get_user_from_api(f'http://localhost:8000{comment.author}')
+            comment.author_username = comment_author.username
+
+        post.comments = comments
+
+    _get_user_from_api.cache_clear()
     template = jinja.get_template('index.html')
     return template.render(
         posts=posts,

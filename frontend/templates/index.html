@@ -2,17 +2,36 @@
 {% block title %}MeetBook Homepage{% endblock %}
 {% block content %}
   <div>
-    {% if not posts %}
-      <p>There are no posts to see!</p>
-    {% endif %}
-
+    <div class="post">
+      <label for="textarea">Write your post:</label>
+      <textarea id="textarea" maxlength="512" rows="4"></textarea>
+      <input type="button" value="Post">
+    </div>
     {% for post in posts %}
-      <h3><em>{{ post.author_username }}</em> wrote on {{ post.date }}:</h3>
-      <article>
-        <p>
-          {{ post.content }}
-        </p>
-      </article>
+      <div class="post">
+        <article>
+          <h3><a href="{{ post.author }}">{{ post.author_username }}</a> wrote on {{ post.date }}:</h3>
+          <p>
+            {{ post.content }}
+          </p>
+
+          {% for comment in post.comments %}
+            <article class="comment">
+              <p>
+                <a href="{{ comment.author }}">{{ comment.author_username }}</a>: {{ comment.content }}
+              </p>
+            </article>
+          {% else %}
+            <p>This post has no comments...</p>
+          {% endfor %}
+        </article>
+        <div id="{{ post.uuid }}">
+          <label>Comment on this: <input class="comment-input" type="text"></label>
+          <input type="button" value="Comment">
+        </div>
+      </div>
+    {% else %}
+      <p>There are no posts to see!</p>
     {% endfor %}
   </div>
 {% endblock %}
