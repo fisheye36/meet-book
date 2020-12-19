@@ -7,6 +7,7 @@ class Database:
     DB_URI = f'neo4j://{config.db_hostname}:{config.db_port}'
 
     def __init__(self) -> None:
+        print(f'Attempting to connect to the database at {self.DB_URI}')
         self._driver = GraphDatabase.driver(self.DB_URI, auth=(config.db_username, config.db_password))
         with self.session as init_session:
             init_session.run('CREATE CONSTRAINT unique_username IF NOT EXISTS '
