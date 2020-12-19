@@ -1,6 +1,6 @@
 from typing import List
 
-from pydantic.main import BaseModel
+from pydantic import BaseModel, Extra
 
 
 class User(BaseModel):
@@ -47,3 +47,6 @@ class PostOut(Post):
     author: str
     comments: List[str] = []
     url: str
+
+    class Config:
+        extra = Extra.allow
