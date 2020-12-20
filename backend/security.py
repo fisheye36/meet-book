@@ -1,7 +1,8 @@
 import json
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBase
 from jwcrypto import jwk, jwt
 from jwcrypto.common import JWException
@@ -54,26 +55,30 @@ def _get_token_key() -> jwk.JWK:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Token generation fail') from None
 
 
+def get_user_if_logged(auth_token: Optional[str] = Cookie(None, alias=config.auth_token_name)) -> Optional[UserOut]:
+    return get_user_from_token(auth_token) if auth_token is not None else None
+
+
 def get_logged_user(auth_credentials: HTTPAuthorizationCredentials = Depends(auth_scheme)) -> UserOut:
     token = auth_credentials.credentials
-    user = get_user_from_token(token)
+    if (user := get_user_from_token(token)) is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Token invalid or expired')
     return user
 
 
-def get_user_from_token(token: str) -> UserOut:
+def get_user_from_token(token: str) -> Optional[UserOut]:
     key = _get_token_key()
     try:
         decoded_token = jwt.JWT(jwt=token, key=key)
     except JWException:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Token invalid or expired')
+        return None
     else:
         claims = json.loads(decoded_token.claims)
         username = claims.get('sub', '')
 
     with database.session as s:
-        results = s.run('MATCH (n:User) WHERE n.username = $username RETURN n', username=username).single()
-        if not results:
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail='Wrong credentials')
+        if not (results := s.run('MATCH (n:User) WHERE n.username = $username RETURN n', username=username).single()):
+            return None
 
         db_user = results['n']
         return UserOut(

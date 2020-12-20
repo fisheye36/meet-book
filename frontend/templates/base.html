@@ -106,9 +106,13 @@
   <div>
     <ul>
       <li><a href="/">Home</a></li>
-      <li><a href="/login">Login</a></li>
-      <li><a href="javascript:logoutUser()">Logout</a></li>
-      <li><a href="/register">Register</a></li>
+      {% if username | length %}
+        <li><a href="javascript:logoutUser()">Logout <em>{{ username }}</em></a></li>
+      {% else %}
+        <li><a href="/login">Login</a></li>
+        <li><a href="/register">Register</a></li>
+      {% endif %}
+      <li><a href="/docs">API Documentation</a></li>
     </ul>
   </div>
 </nav>
@@ -117,9 +121,10 @@
 {% endblock %}
 
 <script>
-  async function logoutUser() {
-      await fetch('/api/logout');
-  }
+    async function logoutUser() {
+        await fetch('/api/logout');
+        location.reload();
+    }
 </script>
 </body>
 </html>
