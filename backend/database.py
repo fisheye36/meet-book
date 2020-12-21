@@ -1,3 +1,5 @@
+from time import sleep
+
 from neo4j import GraphDatabase, Session
 
 from backend.config import config
@@ -7,6 +9,8 @@ class Database:
     DB_URI = f'neo4j://{config.db_hostname}:{config.db_port}'
 
     def __init__(self) -> None:
+        print(f'Waiting for the database to be up before connecting...')
+        sleep(60)
         print(f'Attempting to connect to the database at {self.DB_URI}')
         self._driver = GraphDatabase.driver(self.DB_URI, auth=(config.db_username, config.db_password))
         with self.session as init_session:
