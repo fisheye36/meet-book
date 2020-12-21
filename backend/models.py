@@ -1,6 +1,6 @@
 from typing import List
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, Extra, Field
 
 
 class Message(BaseModel):
@@ -8,7 +8,7 @@ class Message(BaseModel):
 
 
 class User(BaseModel):
-    username: str
+    username: str = Field(..., regex='[a-zA-Z0-9_-]')
 
 
 class UserIn(User):

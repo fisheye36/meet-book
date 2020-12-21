@@ -1,3 +1,4 @@
+import html
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -120,7 +121,7 @@ def create_post(response: Response, post: PostIn, user: UserOut = Depends(get_lo
                 'RETURN p',
                 username=user.username,
                 uuid=uuid(),
-                content=post.content
+                content=html.escape(post.content),
             ).single()
         except ConstraintError:
             raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail='Post UUID duplication') from None
@@ -199,7 +200,7 @@ def create_comment(response: Response, post_id: str, comment: CommentIn, user: U
             username=user.username,
             post_id=post_id,
             uuid=uuid(),
-            content=comment.content
+            content=html.escape(comment.content),
         ).single()
 
         response.status_code = status.HTTP_201_CREATED
